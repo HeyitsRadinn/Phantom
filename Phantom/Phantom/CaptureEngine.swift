@@ -323,28 +323,64 @@ class CaptureEngine {
     }
   }
 
-  // --- Post-Capture Processing ---
-
   private func processCapturedImage(_ image: NSImage, openEditor: Bool) {
-    // This function is now called only on successful capture
+
+    // copy to clipboard
     ClipboardService.shared.copyImageToClipboard(image)
     print("Image copied to clipboard.")
+
+    // save to pictures
+    saveImageToFile(image)
 
     if openEditor {
       print("Opening Annotation Editor (Placeholder)...")
       // TODO: Trigger Annotation Editor UI
     } else {
-      print("Capture complete, editor not requested.")
+      print("Capture complete and saved, editor not requested.")
     }
   }
 
-  // --- Error Handling (Simplified - errors propagated now) ---
+  private func saveImageToFile(_ image: NSImage) {
+      guard let picturesURL = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first else {
+          print("Error: Could not find Pictures directory.")
+          return
+      }
 
-  // No longer needed here as errors are thrown by capture(mode:)
-  // private func processError(_ error: Error) { ... }
+      let phantomFolderURL = picturesURL.appendingPathComponent("Phantom")
+      let fileManager = FileManager.default
+
+      // create phantom dir if it doesnt exist
+      do {
+          try fileManager.createDirectory(at: phantomFolderURL, withIntermediateDirectories: true, attributes: nil)
+      } catch {
+          print("Error creating Phantom directory: \(error)")
+          return
+      }
+
+      // filename
+      let dateFormatter = DateFormatter()
+      dateFormatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+      let timestamp = dateFormatter.string(from: Date())
+      let filename = "Phantom_\(timestamp).png"
+      let fileURL = phantomFolderURL.appendingPathComponent(filename)
+
+      guard let tiffRepresentation = image.tiffRepresentation,
+            let bitmapImage = NSBitmapImageRep(data: tiffRepresentation),
+            let pngData = bitmapImage.representation(using: .png, properties: [:]) else {
+          print("Error: Could not convert NSImage to PNG data.")
+          return
+      }
+
+      do {
+          try pngData.write(to: fileURL)
+          print("Image saved successfully to: \(fileURL.path)")
+      } catch {
+          print("Error saving image to file: \(error)")
+      }
+  }
+
 }
 
-// --- Clipboard Service (Remains the same) ---
 class ClipboardService {
   static let shared = ClipboardService()
   private init() {}
@@ -365,6 +401,3 @@ class ClipboardService {
     }
   }
 }
-
-// Other placeholders remain commented out
-// extension CGRect { ... } // Helper if needed
