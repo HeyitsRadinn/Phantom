@@ -1,6 +1,15 @@
 "use strict";
 const electron = require("electron");
-const validInvokeChannels = ["git:fetch", "git:status", "git:log"];
+const validInvokeChannels = [
+  "git:fetch",
+  "git:status",
+  "git:log",
+  "dialog:openDirectory",
+  "repos:loadKnownPaths",
+  // add channel for loading repo list
+  "repos:saveKnownPaths"
+  // add channel for saving repo list
+];
 electron.contextBridge.exposeInMainWorld("electronAPI", {
   // Expose invoke safely, checking against a whitelist
   invoke: (channel, ...args) => {

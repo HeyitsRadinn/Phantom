@@ -1,10 +1,14 @@
-// Import ipcMain and IpcMainInvokeEvent
-import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent } from 'electron';
+// Import ipcMain, IpcMainInvokeEvent, and dialog
+import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent, dialog } from 'electron';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import Store from 'electron-store'; // Import electron-store
 // Import the git client functions
 import * as gitClient from './gitClient';
+
+// Initialize electron-store
+const store = new Store();
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -52,39 +56,104 @@ function createWindow() {
 
 // --- IPC Handlers ---
 // Use the imported git client functions
-// Using process.env.APP_ROOT as the repo path placeholder
-const REPO_PATH = process.env.APP_ROOT;
+// Removed hardcoded REPO_PATH constant
 
-ipcMain.handle('git:fetch', async (event: IpcMainInvokeEvent, remote: string = 'origin') => {
-  console.log(`IPC Main: Received git:fetch for remote "${remote}"`);
+// Modified handler to accept repoPath and optionally remote
+ipcMain.handle('git:fetch', async (event: IpcMainInvokeEvent, repoPath: string, remote: string = 'origin') => {
+  console.log(`IPC Main: Received git:fetch for repo "${repoPath}", remote "${remote}"`);
+  // Add validation for repoPath
+  if (!repoPath || typeof repoPath !== 'string') {
+    return { status: 'error', message: 'Repository path is required for fetch.' };
+  }
   try {
-    const result = await gitClient.fetchRemote(REPO_PATH, remote);
+    const result = await gitClient.fetchRemote(repoPath, remote); // Use received repoPath
      return { status: 'ok', data: result };
    } catch (error: any) {
-     console.error(`IPC Error git:fetch for remote "${remote}":`, error); // More specific log
+     console.error(`IPC Error git:fetch for repo "${repoPath}", remote "${remote}":`, error); // Updated log
      return { status: 'error', message: error.message || 'Unknown error during fetch.' };
   }
 });
 
-ipcMain.handle('git:status', async (event: IpcMainInvokeEvent) => {
-  console.log('IPC Main: Received git:status');
+// Modified handler to accept repoPath
+ipcMain.handle('git:status', async (event: IpcMainInvokeEvent, repoPath: string) => {
+  console.log(`IPC Main: Received git:status for repo "${repoPath}"`);
+  // Add validation for repoPath
+  if (!repoPath || typeof repoPath !== 'string') {
+    return { status: 'error', message: 'Repository path is required for status.' };
+  }
    try {
-    const files = await gitClient.getStatus(REPO_PATH);
+    const files = await gitClient.getStatus(repoPath); // Use received repoPath
      return { status: 'ok', data: files };
    } catch (error: any) {
-     console.error(`IPC Error git:status for path "${REPO_PATH}":`, error); // More specific log
+     console.error(`IPC Error git:status for path "${repoPath}":`, error); // Updated log
      return { status: 'error', message: error.message || 'Unknown error getting status.' };
   }
 });
 
-ipcMain.handle('git:log', async (event: IpcMainInvokeEvent, depth?: number) => {
-  console.log(`IPC Main: Received git:log with depth ${depth}`);
+// Modified handler to accept repoPath and depth
+ipcMain.handle('git:log', async (event: IpcMainInvokeEvent, repoPath: string, depth?: number) => {
+  console.log(`IPC Main: Received git:log for repo "${repoPath}" with depth ${depth}`);
+  // Add validation for repoPath
+  if (!repoPath || typeof repoPath !== 'string') {
+    return { status: 'error', message: 'Repository path is required for log.' };
+  }
    try {
-    const commits = await gitClient.getLog(REPO_PATH, depth);
+    const commits = await gitClient.getLog(repoPath, depth); // Use received repoPath
      return { status: 'ok', data: commits };
    } catch (error: any) {
-     console.error(`IPC Error git:log for path "${REPO_PATH}" with depth ${depth}:`, error); // More specific log
-     return { status: 'error', message: error.message || 'Unknown error getting log.' };
+     console.error(`IPC Error git:log for path "${repoPath}" with depth ${depth}:`, error); // Updated log
+    return { status: 'error', message: error.message || 'Unknown error getting log.' };
+  }
+});
+
+// Handler for opening directory dialog
+ipcMain.handle('dialog:openDirectory', async () => {
+  if (!win) {
+    return { status: 'error', message: 'Main window not available.' };
+  }
+  console.log('IPC Main: Received dialog:openDirectory');
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, { // Pass window reference
+      properties: ['openDirectory']
+    });
+    if (!canceled && filePaths.length > 0) {
+      console.log(`IPC Main: Directory selected: ${filePaths[0]}`);
+      // TODO: Add validation here to check if it's a git repo (e.g., check for .git dir)
+      return { status: 'ok', path: filePaths[0] };
+    } else {
+      console.log('IPC Main: Directory selection canceled.');
+      return { status: 'canceled', path: null };
+    }
+  } catch (error: any) {
+    console.error('IPC Error dialog:openDirectory:', error);
+     return { status: 'error', message: error.message || 'Unknown error opening directory dialog.' };
+  }
+});
+
+// --- Repository Persistence Handlers ---
+ipcMain.handle('repos:loadKnownPaths', async () => {
+  try {
+    const paths = store.get('knownRepoPaths', []); // Default to empty array if not found
+    console.log('IPC Main: Loaded known repo paths:', paths);
+    return { status: 'ok', data: paths };
+  } catch (error: any) {
+     console.error('IPC Error repos:loadKnownPaths:', error);
+     return { status: 'error', message: error.message || 'Failed to load repository list.' };
+  }
+});
+
+ipcMain.handle('repos:saveKnownPaths', async (event: IpcMainInvokeEvent, paths: string[]) => {
+   try {
+    // Basic validation
+    if (!Array.isArray(paths) || !paths.every(p => typeof p === 'string')) {
+       throw new Error('Invalid data format for knownRepoPaths.');
+    }
+    store.set('knownRepoPaths', paths);
+    console.log('IPC Main: Saved known repo paths:', paths);
+    return { status: 'ok' };
+  } catch (error: any) {
+     console.error('IPC Error repos:saveKnownPaths:', error);
+     return { status: 'error', message: error.message || 'Failed to save repository list.' };
   }
 });
 // --- End IPC Handlers ---

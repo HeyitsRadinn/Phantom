@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Command } from "cmdk";
 import useAppStore from "../store/appStore";
 
+// command palette
 const CommandPalette: React.FC = () => {
   const [open, setOpen] = useState(false);
   const {
@@ -10,6 +11,9 @@ const CommandPalette: React.FC = () => {
     setLoadingStatus,
     setCommitLog,
     setLoadingLog,
+    setActiveRepoPath,
+    addKnownRepoPath,
+    activeRepoPath,
   } = useAppStore();
 
   // toggle
@@ -34,10 +38,17 @@ const CommandPalette: React.FC = () => {
   // call handlers
   const handleFetch = async () => {
     closePalette();
+    if (!activeRepoPath) {
+      console.error("Fetch error: No repository selected.");
+      return;
+    }
     if (window.electronAPI?.invoke) {
       console.log("CommandPalette: Invoking git:fetch");
       try {
-        const result = await window.electronAPI.invoke("git:fetch");
+        const result = await window.electronAPI.invoke(
+          "git:fetch",
+          activeRepoPath
+        );
         console.log("CommandPalette: Received git:fetch result:", result);
         if (result.status === "ok") {
           handleRefreshStatus();
@@ -52,11 +63,20 @@ const CommandPalette: React.FC = () => {
 
   const handleRefreshStatus = async () => {
     closePalette();
+    if (!activeRepoPath) {
+      // check activeRepoPath
+      console.error("Refresh status error: No repository selected.");
+      return;
+    }
     if (window.electronAPI?.invoke) {
       setLoadingStatus(true);
       setFileStatus([], true, null);
       try {
-        const result = await window.electronAPI.invoke("git:status");
+        // pass activeRepoPath
+        const result = await window.electronAPI.invoke(
+          "git:status",
+          activeRepoPath
+        );
         if (result.status === "ok") {
           setFileStatus(result.data, false, null);
         } else {
@@ -74,11 +94,21 @@ const CommandPalette: React.FC = () => {
 
   const handleRefreshLog = async () => {
     closePalette();
+    if (!activeRepoPath) {
+      // check activeRepoPath
+      console.error("Refresh log error: No repository selected.");
+      return;
+    }
     if (window.electronAPI?.invoke) {
       setLoadingLog(true);
       setCommitLog([], true, null);
       try {
-        const result = await window.electronAPI.invoke("git:log", 50);
+        // pass activeRepoPath
+        const result = await window.electronAPI.invoke(
+          "git:log",
+          activeRepoPath,
+          50
+        );
         if (result.status === "ok") {
           setCommitLog(result.data, false, null);
         } else {
@@ -98,6 +128,32 @@ const CommandPalette: React.FC = () => {
   const handleGoToChanges = () => {
     setActiveView("Changes");
     closePalette();
+  };
+
+  // open repo handler
+  const handleOpenRepository = async () => {
+    closePalette();
+    if (window.electronAPI?.invoke) {
+      console.log("CommandPalette: Invoking dialog:openDirectory");
+      try {
+        const result = await window.electronAPI.invoke("dialog:openDirectory");
+        console.log(
+          "CommandPalette: Received dialog:openDirectory result:",
+          result
+        );
+        if (result.status === "ok" && result.path) {
+          addKnownRepoPath(result.path); // add to known paths
+          setActiveRepoPath(result.path); // set as active
+          setActiveView("Changes");
+        } else if (result.status === "canceled") {
+          console.log("Repository selection canceled.");
+        } else {
+          console.error("Error opening directory:", result.message);
+        }
+      } catch (error: any) {
+        console.error("IPC Error calling dialog:openDirectory:", error);
+      }
+    }
   };
 
   const handleGoToHistory = () => {
@@ -169,6 +225,24 @@ const CommandPalette: React.FC = () => {
             </Command.Item>
             <Command.Item className={itemClasses} onSelect={handleGoToSettings}>
               Go to Settings
+            </Command.Item>
+          </Command.Group>
+          <Command.Group heading="Repository" className={groupHeadingClasses}>
+            <Command.Item
+              className={itemClasses}
+              onSelect={handleOpenRepository}
+            >
+              {" "}
+              Open Repository...
+            </Command.Item>
+            <Command.Item
+              className={itemClasses}
+              onSelect={() => {
+                console.log("Action: Clone Repository (Not Implemented)");
+                closePalette();
+              }}
+            >
+              Clone Repository... (Not Implemented)
             </Command.Item>
           </Command.Group>
         </Command.List>

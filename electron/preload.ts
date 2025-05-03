@@ -2,7 +2,14 @@ import { ipcRenderer, contextBridge, IpcRendererEvent } from 'electron'
 
 // Whitelist of valid channels for IPC communication
 // Define channels that the renderer is allowed to invoke on the main process
-const validInvokeChannels = ['git:fetch', 'git:status', 'git:log']; // Example channels to add later
+const validInvokeChannels = [
+  'git:fetch',
+  'git:status',
+  'git:log',
+  'dialog:openDirectory',
+  'repos:loadKnownPaths', // add channel for loading repo list
+  'repos:saveKnownPaths'  // add channel for saving repo list
+]
 
 // --------- Expose a controlled API to the Renderer process ---------
 contextBridge.exposeInMainWorld('electronAPI', {
