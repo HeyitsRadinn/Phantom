@@ -1,37 +1,26 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/electron-vite.animate.svg";
-import "./App.css";
+import React from 'react';
+import Sidebar from './components/Sidebar';
+import Header from './components/Header'; // Import Header
+import MainView from './components/MainView';
+import CommandPalette from './components/CommandPalette';
 
 function App() {
-  const [count, setCount] = useState(0);
-
   return (
     <>
-      <div>
-        <a href="https://electron-vite.github.io" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+      {/* Animated background accent for the whole app */}
+      <div className="fixed inset-0 -z-10 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-tr from-sky-400/10 via-fuchsia-400/5 to-indigo-400/10 blur-2xl opacity-70 animate-gradient-shift-slow" />
+        <div className="absolute left-1/2 top-0 -translate-x-1/2 w-[80vw] h-[300px] rounded-full bg-gradient-to-r from-sky-400/20 via-purple-400/10 to-pink-400/10 blur-3xl opacity-40 animate-gradient-rotate" />
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
+      <div className="flex h-screen bg-white dark:bg-zinc-950 transition-colors duration-300">
+        <Sidebar />
+        {/* Wrap Header and MainView for proper layout */}
+        <div className="flex flex-col flex-1">
+          <Header />
+          <MainView />
+        </div>
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-      <div className="absolute top-0 left-0 w-full h-[260px] z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-tr from-sky-400/20 via-fuchsia-400/10 to-indigo-400/20 blur-2xl opacity-70 animate-gradient-shift-slow" />
-        <div className="absolute left-1/2 top-0 -translate-x-1/2 w-[60vw] h-[180px] rounded-full bg-gradient-to-r from-sky-400/30 via-purple-400/20 to-pink-400/20 blur-3xl opacity-60 animate-gradient-rotate" />
-      </div>{" "}
+      <CommandPalette />
     </>
   );
 }

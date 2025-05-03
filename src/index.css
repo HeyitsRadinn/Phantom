@@ -28,11 +28,25 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
+  /* display: flex; */ /* Removed */
+  /* place-items: center; */ /* Removed */
+  min-width: 320px; 
   min-height: 100vh;
+  /* Ensure body background matches app background if needed */
+  background-color: #0f121a; /* Darker base for body (like zinc-950) */
+  /* Ensure html/body fill height */
+  height: 100%; 
+  overflow: hidden; /* Prevent body scrollbars */
 }
+
+html {
+  height: 100%;
+}
+
+#root { /* Assuming your React app mounts to #root */
+  height: 100%;
+}
+
 
 h1 {
   font-size: 3.2em;
