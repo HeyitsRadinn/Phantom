@@ -11,9 +11,12 @@
   },
   "dependencies": {
     "cmdk": "^1.1.1",
+    "fs": "^0.0.1-security",
+    "isomorphic-git": "^1.30.1",
     "lucide-react": "^0.507.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "zustand": "^5.0.4"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",
