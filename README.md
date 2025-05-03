@@ -1,2 +1,2 @@
 # Phantom
-Phantom: Lightning-Fast, Cross-Platform Screenshot &amp; Markup Tool
+Phantom: The Lightning-Fast, Modern Git GUI
