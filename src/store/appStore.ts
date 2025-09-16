@@ -38,8 +38,17 @@ interface AppState {
   setActiveRepoPath: (path: string | null) => void; // Renamed from setCurrentRepoPath
 
   // placeholder for future state
-  // currentRepo: string | null; // Can likely remove this
-  currentBranch: string | null; // Keep placeholder
+  // currentRepo: string | null;
+
+  // Branch state
+  currentBranch: string | null;
+  localBranches: string[];
+  setCurrentBranch: (branch: string | null) => void;
+  setLocalBranches: (branches: string[]) => void;
+
+  // Loading state for branch operations
+  isCheckingOut: boolean;
+  setIsCheckingOut: (loading: boolean) => void;
 }
 
 // create zustand store
@@ -97,10 +106,24 @@ const useAppStore = create<AppState>((set) => ({
       // reset loading states? optional, depends on desired UX
       // isLoadingStatus: path ? true : false, // Example: start loading on path set
       // isLoadingLog: path ? true : false,
+      // Also clear branch info on repo change
+      currentBranch: null,
+      localBranches: [],
     }),
 
+  // --- Branch State & Actions ---
+  currentBranch: null, // Initialize
+  localBranches: [],
+  setCurrentBranch: (branch) => set({ currentBranch: branch }),
+  setLocalBranches: (branches) => set({ localBranches: branches }),
+
+  // --- Branch Operation Loading State ---
+  isCheckingOut: false,
+  setIsCheckingOut: (loading) => set({ isCheckingOut: loading }),
+
+
+  // --- Placeholder State ---
   currentRepo: null,
-  currentBranch: null,
 }));
 
 export default useAppStore;

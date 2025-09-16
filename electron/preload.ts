@@ -7,8 +7,14 @@ const validInvokeChannels = [
   'git:status',
   'git:log',
   'dialog:openDirectory',
-  'repos:loadKnownPaths', // add channel for loading repo list
-  'repos:saveKnownPaths'  // add channel for saving repo list
+  'repos:loadKnownPaths',
+  'repos:saveKnownPaths',
+  'git:stage',
+  'git:unstage',
+  'git:commit',
+  'git:getCurrentBranch', // Add channel for getting current branch
+  'git:getLocalBranches', // Add channel for listing local branches
+  'git:checkoutBranch'    // Add channel for checking out branches
 ]
 
 // --------- Expose a controlled API to the Renderer process ---------

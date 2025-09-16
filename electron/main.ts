@@ -156,18 +156,97 @@ ipcMain.handle('repos:saveKnownPaths', async (event: IpcMainInvokeEvent, paths: 
      return { status: 'error', message: error.message || 'Failed to save repository list.' };
   }
 });
-// --- End IPC Handlers ---
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-    win = null
+// --- Staging / Commit Handlers ---
+// Add missing git:stage handler
+ipcMain.handle('git:stage', async (event: IpcMainInvokeEvent, repoPath: string, filepath: string) => {
+  console.log(`IPC Main: Received git:stage for ${filepath} in ${repoPath}`);
+  if (!repoPath || !filepath) return { status: 'error', message: 'Repository path and filepath are required.' };
+  try {
+    await gitClient.stageFile(repoPath, filepath);
+    return { status: 'ok' };
+  } catch (error: any) {
+    console.error(`IPC Error git:stage for ${filepath}:`, error);
+    return { status: 'error', message: error.message };
   }
-})
+});
 
+// Add missing git:unstage handler
+ipcMain.handle('git:unstage', async (event: IpcMainInvokeEvent, repoPath: string, filepath: string) => {
+  console.log(`IPC Main: Received git:unstage for ${filepath} in ${repoPath}`);
+  if (!repoPath || !filepath) return { status: 'error', message: 'Repository path and filepath are required.' };
+  try {
+    await gitClient.unstageFile(repoPath, filepath);
+    return { status: 'ok' };
+  } catch (error: any) {
+    console.error(`IPC Error git:unstage for ${filepath}:`, error);
+    return { status: 'error', message: error.message };
+  }
+});
+
+// Commit handler (already exists, ensure context)
+// Commit handler - ensuring getUserConfig is called
+ipcMain.handle('git:commit', async (event: IpcMainInvokeEvent, repoPath: string, message: string) => {
+   console.log(`IPC Main: Received git:commit for ${repoPath}`);
+   if (!repoPath || !message) return { status: 'error', message: 'Repository path and commit message are required.' };
+   try {
+     // Get user config first
+     const author = await gitClient.getUserConfig(repoPath);
+     // Pass retrieved author info to commitChanges
+     console.log(`[IPC Main] Committing with author: ${author.name} <${author.email}>`); // Add log
+     const oid = await gitClient.commitChanges(repoPath, message, author);
+     return { status: 'ok', oid };
+   } catch (error: any) {
+    console.error(`IPC Error git:commit for ${repoPath}:`, error);
+    return { status: 'error', message: error.message };
+  }
+});
+
+// getLocalBranches handler (ensure it's separate)
+ipcMain.handle('git:getLocalBranches', async (event: IpcMainInvokeEvent, repoPath: string) => {
+  console.log(`IPC Main: Received git:getLocalBranches for repo "${repoPath}"`);
+  if (!repoPath) return { status: 'error', message: 'Repository path is required.' };
+  try {
+    const branches = await gitClient.getLocalBranches(repoPath);
+    return { status: 'ok', data: branches };
+  } catch (error: any) {
+    console.error(`IPC Error git:getLocalBranches for ${repoPath}:`, error);
+    return { status: 'error', message: error.message };
+  }
+});
+
+ipcMain.handle('git:checkoutBranch', async (event: IpcMainInvokeEvent, repoPath: string, branchName: string) => {
+  console.log(`IPC Main: Received git:checkoutBranch for ${branchName} in ${repoPath}`);
+  if (!repoPath || !branchName) return { status: 'error', message: 'Repository path and branch name are required.' };
+  try {
+    await gitClient.checkoutBranch(repoPath, branchName);
+    return { status: 'ok' };
+  } catch (error: any) {
+    console.error(`IPC Error git:checkoutBranch for ${branchName}:`, error);
+    // Check if it's a conflict error from isomorphic-git
+    if (error.code === 'CheckoutConflictError') {
+      return { status: 'conflict', message: error.message, files: error.data?.filepaths ?? [] };
+    }
+    // Otherwise, return a generic error
+    return { status: 'error', message: error.message };
+  }
+});
+
+// --- Branch Handlers ---
+// Add missing handler for getCurrentBranch
+ipcMain.handle('git:getCurrentBranch', async (event: IpcMainInvokeEvent, repoPath: string) => {
+  console.log(`IPC Main: Received git:getCurrentBranch for repo "${repoPath}"`);
+  if (!repoPath) return { status: 'error', message: 'Repository path is required.' };
+  try {
+    const branchName = await gitClient.getCurrentBranch(repoPath);
+    return { status: 'ok', data: branchName };
+  } catch (error: any) {
+    console.error(`IPC Error git:getCurrentBranch for ${repoPath}:`, error);
+    return { status: 'error', message: error.message };
+  }
+});
+
+// Handler for getLocalBranches (already added, just ensuring context)
 app.on('activate', () => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.

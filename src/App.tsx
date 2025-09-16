@@ -6,13 +6,15 @@ import CommandPalette from "./components/CommandPalette";
 import useAppStore from "./store/appStore";
 
 function App() {
-  // get actions and repo path from store using the new names
+  // get actions and repo path from store
   const {
     setFileStatus,
     setLoadingStatus,
     setKnownRepoPaths,
     setActiveRepoPath,
-  } = useAppStore(); // Add setKnownRepoPaths, setActiveRepoPath
+    setCurrentBranch,   // Add branch actions
+    setLocalBranches    // Add branch actions
+  } = useAppStore();
   const activeRepoPath = useAppStore((state) => state.activeRepoPath);
 
   // load known repos on mount
@@ -43,54 +45,81 @@ function App() {
       }
     };
     loadRepos();
-  }, []);
+  }, []); // Keep this effect for loading known paths on initial mount
 
-  // fetch status on component mount or when active repo path changes
+  // Fetch status AND branch info when active repo path changes
   useEffect(() => {
-    const fetchStatus = async () => {
+    const fetchDataForRepo = async () => {
       // only fetch if a repo path is selected
       if (!activeRepoPath) {
         setFileStatus([], false, null);
-        setLoadingStatus(false);
+        setCurrentBranch(null);
+        setLocalBranches([]);
+        setLoadingStatus(false); // Ensure loading is off if no repo
         return;
       }
 
       if (window.electronAPI?.invoke) {
-        setLoadingStatus(true);
+        setLoadingStatus(true); // Indicate loading started
+        // Clear previous branch info immediately
+        setCurrentBranch(null);
+        setLocalBranches([]);
+
+        // Fetch status, current branch, and local branches concurrently
         try {
-          console.log(
-            `Renderer: Invoking git:status for path ${activeRepoPath}`
-          );
-          // pass the repo path to the IPC call
-          const result = await window.electronAPI.invoke(
-            "git:status",
-            activeRepoPath
-          );
-          console.log("Renderer: Received git:status result:", result);
-          if (result.status === "ok") {
-            setFileStatus(result.data, false, null);
+          console.log(`Renderer: Fetching data for path ${activeRepoPath}`);
+          const [statusResult, currentBranchResult, localBranchesResult] = await Promise.all([
+            window.electronAPI.invoke("git:status", activeRepoPath),
+            window.electronAPI.invoke("git:getCurrentBranch", activeRepoPath),
+            window.electronAPI.invoke("git:getLocalBranches", activeRepoPath)
+          ]);
+
+          // Handle status
+          console.log("Renderer: Received git:status result:", statusResult);
+          if (statusResult.status === "ok") {
+            setFileStatus(statusResult.data, false, null); // Loading handled by finally block
           } else {
-            console.error("Error fetching status:", result.message);
-            setFileStatus([], false, result.message);
+            console.error("Error fetching status:", statusResult.message);
+            setFileStatus([], false, statusResult.message);
           }
+
+          // Handle current branch
+          console.log("Renderer: Received git:getCurrentBranch result:", currentBranchResult);
+           if (currentBranchResult.status === "ok") {
+            setCurrentBranch(currentBranchResult.data);
+          } else {
+            console.error("Error fetching current branch:", currentBranchResult.message);
+             setCurrentBranch(null); // Set to null on error
+          }
+
+           // Handle local branches
+           console.log("Renderer: Received git:getLocalBranches result:", localBranchesResult);
+           if (localBranchesResult.status === "ok") {
+            setLocalBranches(localBranchesResult.data);
+          } else {
+            console.error("Error fetching local branches:", localBranchesResult.message);
+            setLocalBranches([]); // Set to empty array on error
+          }
+
         } catch (error: any) {
-          console.error("IPC Error calling git:status:", error);
-          setFileStatus(
-            [],
-            false,
-            error.message || "An unknown IPC error occurred"
-          );
+          console.error("IPC Error fetching repo data:", error);
+          setFileStatus([], false, error.message || "An unknown IPC error occurred");
+          setCurrentBranch(null);
+          setLocalBranches([]);
+        } finally {
+           setLoadingStatus(false); // Ensure loading is reset after all fetches complete or fail
         }
       } else {
         console.warn("electronAPI or invoke function not found on window.");
-        // ensure loading is false even if API is not available after path is set
         setFileStatus([], false, "Electron API not available.");
+        setCurrentBranch(null);
+        setLocalBranches([]);
         setLoadingStatus(false);
       }
     };
 
-    fetchStatus();
-  }, [activeRepoPath, setFileStatus, setLoadingStatus]); // add activeRepoPath to dependency array
+    fetchDataForRepo();
+  }, [activeRepoPath, setFileStatus, setLoadingStatus, setCurrentBranch, setLocalBranches]); // Update dependencies
 
   return (
     <>

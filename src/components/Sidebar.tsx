@@ -8,6 +8,8 @@ import {
   Layers,
   ChevronsUpDown,
   PlusCircle,
+  Check,
+  Loader2, // Add loader icon
 } from "lucide-react";
 import { Menu, Transition } from "@headlessui/react";
 import useAppStore from "../store/appStore";
@@ -18,20 +20,32 @@ const SidebarItem: React.FC<{
   count?: number;
   isActive?: boolean;
   onClick?: () => void;
-}> = ({ icon: Icon, label, count, isActive, onClick }) => (
+  isDimmed?: boolean;
+  isDisabled?: boolean; // To disable during checkout
+}> = ({ icon: Icon, label, count, isActive, onClick, isDimmed, isDisabled }) => (
   <li
-    onClick={onClick}
-    className={`flex items-center justify-between px-3 py-1.5 rounded-md text-sm cursor-pointer transition-colors duration-100 group
-    ${
-      isActive
-        ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-200 font-semibold"
-        : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-100"
+    // Disable onClick if isDisabled is true
+    onClick={isDisabled ? undefined : onClick}
+    className={`flex items-center justify-between px-3 py-1.5 rounded-md text-sm transition-colors duration-100 group relative ${
+      isDisabled
+        ? "text-zinc-400 dark:text-zinc-600 cursor-not-allowed" // Disabled style
+        : isActive
+        ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-200 font-semibold cursor-default" // Active (non-clickable visually)
+        : isDimmed
+        ? "text-zinc-500 dark:text-zinc-500 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 hover:text-zinc-700 dark:hover:text-zinc-300 cursor-pointer"
+        : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-100 cursor-pointer"
     }
   `}
   >
     <div className="flex items-center gap-2.5">
-      <Icon className="w-4 h-4" />
+      {/* Show loader instead of check if this item is being checked out */}
+      {isDisabled && label === useAppStore.getState().currentBranch ? (
+         <Loader2 className="w-4 h-4 text-zinc-400 dark:text-zinc-500 animate-spin" />
+      ) : (
+         <Icon className={`w-4 h-4 ${isActive ? '' : 'opacity-80'}`} />
+      )}
       <span className="flex-1 truncate">{label}</span>
+      {isActive && !isDisabled && <Check className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
     </div>
     {count !== undefined && (
       <span
@@ -47,7 +61,7 @@ const SidebarItem: React.FC<{
   </li>
 );
 
-// repo switcher
+// RepoSwitcher remains the same as previous correct version
 const RepoSwitcher: React.FC<{
   activeRepoName: string;
   knownPaths: string[];
@@ -88,14 +102,13 @@ const RepoSwitcher: React.FC<{
                         active ? 'bg-blue-500 text-white' : 'text-zinc-900 dark:text-zinc-100'
                       } group flex rounded-md items-center w-full px-2 py-2 text-sm`}
                     >
-                      {/* TODO: maybe show full path on hover? */}
                       {path.basename(repoPath)}
                     </button>
                   )}
                 </Menu.Item>
               ))
             ) : (
-              <div className="px-2 py-2 text-sm text-zinc-500 italic">No known repositories</div>
+              <div className="px-2 py-2 text-sm text-zinc-500 dark:text-zinc-400 italic">No known repositories</div>
             )}
           </div>
           <div className="px-1 py-1">
@@ -112,7 +125,6 @@ const RepoSwitcher: React.FC<{
                 </button>
               )}
             </Menu.Item>
-             {/* TODO: add clone repo later */}
           </div>
         </Menu.Items>
       </Transition>
@@ -120,26 +132,36 @@ const RepoSwitcher: React.FC<{
   </div>
 );
 
-// sidebar
+
+// Sidebar Component
 const Sidebar: React.FC = () => {
-  // get state and actions from zustand
-  const activeView = useAppStore((state) => state.activeView);
-  const setActiveView = useAppStore((state) => state.setActiveView);
-  const activeRepoPath = useAppStore((state) => state.activeRepoPath);
-  const setActiveRepoPath = useAppStore((state) => state.setActiveRepoPath);
-  const addKnownRepoPath = useAppStore((state) => state.addKnownRepoPath);
-  const knownRepoPaths = useAppStore((state) => state.knownRepoPaths);
+  // Get state and actions from Zustand store
+  const {
+    activeView,
+    setActiveView,
+    activeRepoPath,
+    setActiveRepoPath,
+    addKnownRepoPath,
+    knownRepoPaths,
+    currentBranch,
+    setCurrentBranch,
+    localBranches,
+    // Removed setLocalBranches, setFileStatus, setCommitLog as they are not directly needed here
+    // setLoadingStatus, // Can remove if not used directly here
+    isCheckingOut,    // Get checkout loading state
+    setIsCheckingOut, // Get checkout loading action
+  } = useAppStore();
 
   const repoName = activeRepoPath ? path.basename(activeRepoPath) : "Select Repository...";
 
-  // handler to add repo
+  // --- Handlers ---
   const handleAddRepository = async () => {
     if (window.electronAPI?.invoke) {
       try {
         const result = await window.electronAPI.invoke('dialog:openDirectory');
         if (result.status === 'ok' && result.path) {
-          addKnownRepoPath(result.path); 
-          setActiveRepoPath(result.path); 
+          addKnownRepoPath(result.path);
+          setActiveRepoPath(result.path); // This will trigger data refresh via useEffect in App.tsx
           setActiveView('Changes');
         }
       } catch (error) {
@@ -148,18 +170,60 @@ const Sidebar: React.FC = () => {
     }
   };
 
-  // handler for selecting a repo
   const handleSelectRepository = (path: string) => {
     if (path !== activeRepoPath) {
-      setActiveRepoPath(path);
-      setActiveView('Changes'); // switch to changes view
+      setActiveRepoPath(path); // This will trigger data refresh via useEffect in App.tsx
+      setActiveView('Changes');
     }
   };
 
-  // get dynamic data based on active repo
+  // Refined checkout handler
+   const handleCheckoutBranch = async (branchName: string) => {
+     if (!activeRepoPath || branchName === currentBranch || isCheckingOut || !window.electronAPI?.invoke) return;
+
+     console.log(`Requesting checkout: ${branchName}`);
+     setIsCheckingOut(true); // Set loading state
+
+     try {
+       const checkoutResult = await window.electronAPI.invoke('git:checkoutBranch', activeRepoPath, branchName);
+
+       if (checkoutResult.status === 'ok') {
+         console.log(`Checkout successful, fetching new branch name...`);
+          // After successful checkout, just fetch the new current branch name
+          // The useEffect in App listening to activeRepoPath will handle status/log refresh
+         const currentBranchResult = await window.electronAPI.invoke("git:getCurrentBranch", activeRepoPath);
+         if (currentBranchResult.status === 'ok') {
+           setCurrentBranch(currentBranchResult.data);
+           // Optionally refresh local branches list too, though less critical immediately
+           // const localBranchesResult = await window.electronAPI.invoke("git:getLocalBranches", activeRepoPath);
+           // if (localBranchesResult.status === 'ok') setLocalBranches(localBranchesResult.data);
+         } else {
+            console.error("Error fetching current branch after checkout:", currentBranchResult.message);
+            setCurrentBranch(null); // Reset on error
+         }
+          // Force refresh status/log via App.tsx's useEffect dependency on activeRepoPath
+          // (Alternative: Could manually trigger status/log refresh here if needed)
+
+       } else if (checkoutResult.status === 'conflict') {
+          // Handle checkout conflict
+          console.warn(`Checkout conflict for ${branchName}:`, checkoutResult.message);
+          const fileList = checkoutResult.files?.join('\n - ') || 'unknown files';
+          alert(`Checkout Conflict:\n\nCannot switch to branch '${branchName}' because of uncommitted changes in the following files:\n\n - ${fileList}\n\nPlease commit, stash, or discard your changes before switching branches.`);
+       } else {
+         // Handle other generic errors
+         console.error(`Error checking out ${branchName}:`, checkoutResult.message);
+         alert(`Error checking out branch '${branchName}':\n${checkoutResult.message}`);
+       }
+     } catch (error: any) { // Catch IPC errors
+       console.error(`IPC Error checking out ${branchName}:`, error);
+       alert(`Failed to checkout branch '${branchName}':\n${error.message}`);
+        // TODO: Show checkout error to user via toast/notification
+     } finally {
+       setIsCheckingOut(false); // Reset loading state regardless of outcome
+     }
+   };
+
   const changesCount = useAppStore((state) => state.fileStatus.length);
-  // TODO: get current branch name dynamically
-  const currentBranch = "main"; // placeholder for now
 
   return (
     <aside className="relative w-60 md:w-64 h-screen flex flex-col pt-4 pb-4 px-3 bg-zinc-100 dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 z-20 overflow-y-auto">
@@ -184,12 +248,14 @@ const Sidebar: React.FC = () => {
                   count={changesCount > 0 ? changesCount : undefined}
                   isActive={activeView === "Changes"}
                   onClick={() => setActiveView("Changes")}
+                  isDisabled={isCheckingOut} // Disable during checkout
                 />
                 <SidebarItem
                   icon={History}
                   label="History"
                   isActive={activeView === "History"}
                   onClick={() => setActiveView("History")}
+                  isDisabled={isCheckingOut} // Disable during checkout
                 />
               </ul>
             </div>
@@ -198,12 +264,33 @@ const Sidebar: React.FC = () => {
                 Branches
               </h3>
               <ul className="space-y-0.5">
-                <SidebarItem
-                  icon={GitBranch}
-                  label={currentBranch} // placeholder for now
-                  isActive={false} // TODO: needs logic
-                />
-                {/* TODO: fetch and list other branches */}
+                 {/* Display current branch first, always */}
+                 {currentBranch && (
+                      <SidebarItem
+                         key={currentBranch}
+                         icon={GitBranch}
+                         label={currentBranch}
+                         isActive={true} // Mark current as active
+                         isDisabled={isCheckingOut} // Disable during checkout
+                         // No onClick needed for active branch? Or maybe refresh?
+                      />
+                 )}
+                 {/* List other local branches */}
+                 {localBranches.filter(branch => branch !== currentBranch).map(branch => (
+                      <SidebarItem
+                         key={branch}
+                         icon={GitBranch}
+                         label={branch}
+                         isActive={false}
+                         isDimmed={true} // Dim non-active branches
+                         isDisabled={isCheckingOut} // Disable during checkout
+                         onClick={() => handleCheckoutBranch(branch)}
+                      />
+                 ))}
+                 {/* Placeholder if no branches */}
+                 {!currentBranch && localBranches.length === 0 && (
+                     <li className="px-3 py-1.5 text-sm text-zinc-400 dark:text-zinc-500 italic">No branches found</li>
+                 )}
               </ul>
             </div>
              <div>
@@ -211,16 +298,14 @@ const Sidebar: React.FC = () => {
                 Stashes
               </h3>
               <ul className="space-y-0.5">
-                {/* TODO: fetch and display actual stashes */}
                 <li className="px-3 py-1.5 text-sm text-zinc-400 dark:text-zinc-500 italic">No stashes</li>
               </ul>
             </div>
-             {/* TODO: add remotes */}
           </>
         )}
       </nav>
       <div className="relative mt-auto px-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
-        {/* settings placeholder */}
+        {/* Settings placeholder */}
       </div>
     </aside>
   );

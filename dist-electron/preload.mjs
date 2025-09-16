@@ -6,9 +6,16 @@ const validInvokeChannels = [
   "git:log",
   "dialog:openDirectory",
   "repos:loadKnownPaths",
-  // add channel for loading repo list
-  "repos:saveKnownPaths"
-  // add channel for saving repo list
+  "repos:saveKnownPaths",
+  "git:stage",
+  "git:unstage",
+  "git:commit",
+  "git:getCurrentBranch",
+  // Add channel for getting current branch
+  "git:getLocalBranches",
+  // Add channel for listing local branches
+  "git:checkoutBranch"
+  // Add channel for checking out branches
 ];
 electron.contextBridge.exposeInMainWorld("electronAPI", {
   // Expose invoke safely, checking against a whitelist

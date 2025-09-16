@@ -11,7 +11,8 @@ const formatDate = (timestamp: number): string => {
 const CommitLogList: React.FC<{ commits: CommitLog[] }> = ({ commits }) => {
   if (commits.length === 0) {
     return (
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+      // Ensure placeholder text has dark mode color
+      <p className="text-sm text-zinc-500 dark:text-zinc-400 p-2">
         No commits found.
       </p>
     );
@@ -25,17 +26,21 @@ const CommitLogList: React.FC<{ commits: CommitLog[] }> = ({ commits }) => {
           className="border-b border-zinc-200 dark:border-zinc-700 pb-2 last:border-b-0"
         >
           <div className="flex justify-between items-center mb-1">
+            {/* Ensure commit hash color is appropriate */}
             <span className="font-mono text-xs text-blue-600 dark:text-blue-400">
               {commit.oid.substring(0, 7)}
             </span>
+             {/* Ensure timestamp color is appropriate */}
             <span className="text-xs text-zinc-500 dark:text-zinc-400">
               {formatDate(commit.committer.timestamp)}
             </span>
           </div>
+           {/* Ensure commit message color is appropriate */}
           <p className="font-medium text-zinc-800 dark:text-zinc-100 mb-0.5">
             {commit.message.split("\n")[0]}
           </p>
-          <p className="text-xs text-zinc-600 dark:text-zinc-300">
+           {/* Ensure author color is appropriate */}
+          <p className="text-xs text-zinc-600 dark:text-zinc-400"> {/* Adjusted dark mode author color */}
             {`${commit.author.name} <${commit.author.email}>`}
           </p>
         </li>
@@ -101,19 +106,22 @@ const HistoryPanel: React.FC = () => {
   let content;
   if (!activeRepoPath) {
     content = (
+       // Ensure placeholder text has dark mode color
       <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center p-4">
         Open a repository to view history.
       </p>
     );
   } else if (isLoadingLog) {
     content = (
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+       // Ensure loading text has dark mode color
+      <p className="text-sm text-zinc-500 dark:text-zinc-400 p-2">
         Loading history...
       </p>
     );
   } else if (errorLog) {
     content = (
-      <p className="text-sm text-red-600 dark:text-red-400">
+       // Ensure error text has dark mode color
+      <p className="text-sm text-red-600 dark:text-red-400 p-2">
         Error: {errorLog}
       </p>
     );
@@ -127,7 +135,8 @@ const HistoryPanel: React.FC = () => {
         Commit History{" "}
         {activeRepoPath ? `(${path.basename(activeRepoPath)})` : ""}{" "}
       </h2>
-      <div className="flex-1 overflow-y-auto border border-zinc-200 dark:border-zinc-700 rounded-md p-3 bg-white dark:bg-zinc-900/50">
+       {/* Use consistent panel background */}
+      <div className="flex-1 overflow-y-auto border border-zinc-200 dark:border-zinc-700 rounded-md p-3 bg-white dark:bg-zinc-900">
         {content}
       </div>
     </div>
